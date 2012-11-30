@@ -1,5 +1,5 @@
 unsigned long echo = 0;
-int ultraSoundSignal = 52; // Ultrasound signal pin
+int ultraSoundSignal = 34; // Ultrasound signal pin
 unsigned long ultrasoundValue = 0;
  
 void setup()
