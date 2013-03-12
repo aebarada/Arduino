@@ -2,7 +2,6 @@
 // Toy Mode - THOR
 ////////////////////////////////////////////////////////////////////////////////
 static boolean CH7_toy_flag;
-//static boolean CH6_toy_flag;
 
 #if TOY_MIXER == TOY_LOOKUP_TABLE
 static const int16_t toy_lookup[] = {
@@ -109,23 +108,23 @@ void roll_pitch_toy()
     int16_t yaw_rate = g.rc_1.control_in / g.toy_yaw_rate;
 
     if(g.rc_1.control_in != 0) {    // roll
-        g.rc_4.servo_out = get_acro_yaw(yaw_rate/2);
-        yaw_stopped = false;
+        get_acro_yaw(yaw_rate/2);
+        ap_system.yaw_stopped = false;
         yaw_timer = 150;
 
-    }else if (!yaw_stopped) {
-        g.rc_4.servo_out = get_acro_yaw(0);
+    }else if (!ap_system.yaw_stopped) {
+        get_acro_yaw(0);
         yaw_timer--;
 
         if((yaw_timer == 0) || (fabs(omega.z) < .17)) {
-            yaw_stopped = true;
+            ap_system.yaw_stopped = true;
             nav_yaw = ahrs.yaw_sensor;
         }
     }else{
         if(motors.armed() == false || g.rc_3.control_in == 0)
             nav_yaw = ahrs.yaw_sensor;
 
-        g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
+        get_stabilize_yaw(nav_yaw);
     }
 #endif
 
@@ -157,7 +156,7 @@ void roll_pitch_toy()
 
 #elif TOY_MIXER == TOY_LINEAR_MIXER
     roll_rate = -((int32_t)g.rc_2.control_in * (yaw_rate/100)) /30;
-    //Serial.printf("roll_rate: %d\n",roll_rate);
+    //cliSerial->printf("roll_rate: %d\n",roll_rate);
     roll_rate = constrain(roll_rate, -2000, 2000);
 
 #elif TOY_MIXER == TOY_EXTERNAL_MIXER
@@ -167,13 +166,17 @@ void roll_pitch_toy()
 
 #if TOY_EDF == ENABLED
     // Output the attitude
-    g.rc_1.servo_out = get_stabilize_roll(roll_rate);
-    g.rc_2.servo_out = get_stabilize_pitch(g.rc_6.control_in);             // use CH6 to trim pitch
+    //g.rc_1.servo_out = get_stabilize_roll(roll_rate);
+    //g.rc_2.servo_out = get_stabilize_pitch(g.rc_6.control_in);             // use CH6 to trim pitch
+    get_stabilize_roll(roll_rate);
+    get_stabilize_pitch(g.rc_6.control_in);             // use CH6 to trim pitch
 
 #else
     // Output the attitude
-    g.rc_1.servo_out = get_stabilize_roll(roll_rate);
-    g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
+    //g.rc_1.servo_out = get_stabilize_roll(roll_rate);
+    //g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
+    get_stabilize_roll(roll_rate);
+    get_stabilize_pitch(g.rc_2.control_in);
 #endif
 
 }

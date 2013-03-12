@@ -37,8 +37,7 @@ extern "C" {
 #include <inttypes.h>
 #include <avr/interrupt.h>
 }
-//#include <FastSerial.h>
-//#include <AP_Common.h>
+#include <FastSerial.h>
 
 #if defined(ARDUINO) && ARDUINO >= 100
  #include "Arduino.h"
@@ -46,6 +45,7 @@ extern "C" {
  #include "WConstants.h"
 #endif
 
+#include <AP_Semaphore.h>               // for removing conflict with optical flow sensor on SPI3 bus
 #include "DataFlash_APM2.h"
 /*
  * #define ENABLE_FASTSERIAL_DEBUG
@@ -58,7 +58,7 @@ extern "C" {
  #  //*/
 
 // DataFlash is connected to Serial Port 3 (we will use SPI mode)
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(DESKTOP_BUILD)
  #define DF_DATAOUT 14               // MOSI
  #define DF_DATAIN  15               // MISO
  #define DF_SPICLOCK  PJ2            // SCK
@@ -93,6 +93,16 @@ extern "C" {
 // *** INTERNAL FUNCTIONS ***
 unsigned char DataFlash_APM2::SPI_transfer(unsigned char data)
 {
+    unsigned char retval;
+
+    // get spi3 semaphore if required.  if failed to get semaphore then
+    // just quietly fail
+    if ( _spi3_semaphore != NULL) {
+        if( !_spi3_semaphore->get(this) ) {
+            return 0;
+        }
+    }
+
     /* Wait for empty transmit buffer */
     while ( !( UCSR3A & (1<<UDRE3)) ) ;
     /* Put data into buffer, sends the data */
@@ -100,7 +110,14 @@ unsigned char DataFlash_APM2::SPI_transfer(unsigned char data)
     /* Wait for data to be received */
     while ( !(UCSR3A & (1<<RXC3)) ) ;
     /* Get and return received data from buffer */
-    return UDR3;
+    retval = UDR3;
+
+    // release spi3 semaphore
+    if ( _spi3_semaphore != NULL) {
+        _spi3_semaphore->release(this);
+    }
+
+    return retval;
 }
 
 // disable device
@@ -113,11 +130,6 @@ void DataFlash_APM2::CS_inactive()
 void DataFlash_APM2::CS_active()
 {
     digitalWrite(DF_SLAVESELECT,LOW);
-}
-
-// Constructors ////////////////////////////////////////////////////////////////
-DataFlash_APM2::DataFlash_APM2()
-{
 }
 
 // Public Methods //////////////////////////////////////////////////////////////

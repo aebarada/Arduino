@@ -13,23 +13,32 @@
 
 // Flight modes
 // ------------
-#define YAW_HOLD                        0
-#define YAW_ACRO                        1
-#define YAW_AUTO                        2
-#define YAW_LOOK_AT_HOME        3
-#define YAW_TOY                         4       // THOR This is the Yaw mode
+#define YAW_HOLD                        0       // heading hold at heading in nav_yaw but allow input from pilot
+#define YAW_ACRO                        1       // pilot controlled yaw using rate controller
+#define YAW_LOOK_AT_NEXT_WP             2       // point towards next waypoint (no pilot input accepted)
+#define YAW_LOOK_AT_LOCATION            3       // point towards a location held in yaw_look_at_WP (no pilot input accepted)
+#define YAW_LOOK_AT_HOME    		    4       // point towards home (no pilot input accepted)
+#define YAW_LOOK_AT_HEADING    		    5       // point towards a particular angle (not pilot input accepted)
+#define YAW_LOOK_AHEAD					6		// WARNING!  CODE IN DEVELOPMENT NOT PROVEN
+#define YAW_TOY                         7       // THOR This is the Yaw mode
 
 
 #define ROLL_PITCH_STABLE       0
 #define ROLL_PITCH_ACRO         1
 #define ROLL_PITCH_AUTO         2
 #define ROLL_PITCH_STABLE_OF    3
-#define ROLL_PITCH_TOY          4       // THOR This is the Roll and Pitch
-                                        // mode
+#define ROLL_PITCH_TOY          4       // THOR This is the Roll and Pitch mode
+#define ROLL_PITCH_LOITER_PR    5
 
-#define THROTTLE_MANUAL         0
-#define THROTTLE_HOLD           1
-#define THROTTLE_AUTO           2
+#define THROTTLE_MANUAL                     0   // manual throttle mode - pilot input goes directly to motors
+#define THROTTLE_MANUAL_TILT_COMPENSATED    1   // mostly manual throttle but with some tilt compensation
+#define THROTTLE_ACCELERATION               2   // pilot inputs the desired acceleration
+#define THROTTLE_RATE                       3   // pilot inputs the desired climb rate.  Note: this uses the unstabilized rate controller
+#define THROTTLE_STABILIZED_RATE            4   // pilot inputs the desired climb rate.  Uses stabilized rate controller
+#define THROTTLE_DIRECT_ALT                 5   // pilot inputs a desired altitude from 0 ~ 10 meters
+#define THROTTLE_HOLD                       6   // alt hold plus pilot input of climb rate
+#define THROTTLE_AUTO                       7   // auto pilot altitude controller with target altitude held in next_WP.alt
+#define THROTTLE_LAND                       8   // landing throttle controller
 
 
 // active altitude sensor
@@ -41,15 +50,22 @@
 #define SONAR_SOURCE_ANALOG_PIN 2
 
 // CH 7 control
+#define CH7_PWM_TRIGGER 1800    // pwm value above which the channel 7 option will be invoked
+#define CH6_PWM_TRIGGER_HIGH 1800
+#define CH6_PWM_TRIGGER_LOW 1200
+
 #define CH7_DO_NOTHING 0
-#define CH7_SET_HOVER 1
+#define CH7_SET_HOVER 1         // deprecated
 #define CH7_FLIP 2
 #define CH7_SIMPLE_MODE 3
 #define CH7_RTL 4
-#define CH7_AUTO_TRIM 5
-#define CH7_ADC_FILTER 6
+#define CH7_SAVE_TRIM 5
+#define CH7_ADC_FILTER 6        // deprecated
 #define CH7_SAVE_WP 7
 #define CH7_MULTI_MODE 8
+#define CH7_CAMERA_TRIGGER 9
+#define CH7_SONAR 10            // allow enabling or disabling sonar in flight which helps avoid surface tracking when you are far above the ground
+
 
 
 // Frame types
@@ -67,13 +83,8 @@
 
 // LED output
 #define NORMAL_LEDS 0
-#define AUTO_TRIM_LEDS 1
+#define SAVE_TRIM_LEDS 1
 
-
-#define CH_7_PWM_TRIGGER 1800
-#define CH_6_PWM_TRIGGER_HIGH 1800
-#define CH_6_PWM_TRIGGER 1500
-#define CH_6_PWM_TRIGGER_LOW 1200
 
 // Internal defines, don't edit and expect things to work
 // -------------------------------------------------------
@@ -97,27 +108,18 @@
 #define GPS_PROTOCOL_IMU        3
 #define GPS_PROTOCOL_MTK        4
 #define GPS_PROTOCOL_HIL        5
-#define GPS_PROTOCOL_MTK16      6
+#define GPS_PROTOCOL_MTK19      6
 #define GPS_PROTOCOL_AUTO       7
 
-#define CH_ROLL CH_1
-#define CH_PITCH CH_2
-#define CH_THROTTLE CH_3
-#define CH_RUDDER CH_4
-#define CH_YAW CH_4
-
-#define RC_CHANNEL_ANGLE 0
-#define RC_CHANNEL_RANGE 1
-#define RC_CHANNEL_ANGLE_RAW 2
-
 // HIL enumerations
-#define HIL_MODE_DISABLED                       0
-#define HIL_MODE_ATTITUDE                       1
-#define HIL_MODE_SENSORS                        2
+#define HIL_MODE_DISABLED               0
+#define HIL_MODE_ATTITUDE               1
+#define HIL_MODE_SENSORS                2
 
-#define ASCENDING                       1
-#define DESCENDING                      -1
+// Altitude status definitions
 #define REACHED_ALT                     0
+#define DESCENDING                      1
+#define ASCENDING                       2
 
 // Auto Pilot modes
 // ----------------
@@ -131,70 +133,53 @@
 #define CIRCLE 7                        // AUTO control
 #define POSITION 8                      // AUTO control
 #define LAND 9                          // AUTO control
-#define OF_LOITER 10            // Hold a single location using optical flow
-                                // sensor
-#define TOY_A 11                                // THOR Enum for Toy mode
-#define TOY_M 12                                // THOR Enum for Toy mode
+#define OF_LOITER 10                    // Hold a single location using optical flow
+                                        // sensor
+#define TOY_A 11                        // THOR Enum for Toy mode
+#define TOY_M 12                        // THOR Enum for Toy mode
 #define NUM_MODES 13
-
-#define SIMPLE_1 1
-#define SIMPLE_2 2
-#define SIMPLE_3 4
-#define SIMPLE_4 8
-#define SIMPLE_5 16
-#define SIMPLE_6 32
 
 // CH_6 Tuning
 // -----------
-#define CH6_NONE 0
-// Attitude
-#define CH6_STABILIZE_KP 1
-#define CH6_STABILIZE_KI 2
-#define CH6_STABILIZE_KD 29             // duplicate with CH6_DAMP
-#define CH6_YAW_KP 3
-#define CH6_YAW_KI 24
-// Rate
-#define CH6_ACRO_KP 25
-#define CH6_RATE_KP 4
-#define CH6_RATE_KI 5
-#define CH6_RATE_KD 21
-#define CH6_YAW_RATE_KP 6
-#define CH6_YAW_RATE_KD 26
-// Altitude rate controller
-#define CH6_THROTTLE_KP 7
-// Extras
-#define CH6_TOP_BOTTOM_RATIO 8
-#define CH6_RELAY 9
-// Navigation
-#define CH6_TRAVERSE_SPEED 10   // maximum speed to next way point
-#define CH6_NAV_KP 11
-#define CH6_LOITER_KP 12
-#define CH6_LOITER_KI 27
+#define CH6_NONE            0           // no tuning performed
+#define CH6_STABILIZE_KP    1           // stabilize roll/pitch angle controller's P term
+#define CH6_STABILIZE_KI    2           // stabilize roll/pitch angle controller's I term
+#define CH6_STABILIZE_KD    29          // stabilize roll/pitch angle controller's D term
+#define CH6_YAW_KP          3           // stabilize yaw heading controller's P term
+#define CH6_YAW_KI          24          // stabilize yaw heading controller's P term
+#define CH6_ACRO_KP         25          // acro controller's P term.  converts pilot input to a desired roll, pitch or yaw rate
+#define CH6_RATE_KP         4           // body frame roll/pitch rate controller's P term
+#define CH6_RATE_KI         5           // body frame roll/pitch rate controller's I term
+#define CH6_RATE_KD         21          // body frame roll/pitch rate controller's D term
+#define CH6_YAW_RATE_KP     6           // body frame yaw rate controller's P term
+#define CH6_YAW_RATE_KD     26          // body frame yaw rate controller's D term
+#define CH6_THR_HOLD_KP     14          // altitude hold controller's P term (alt error to desired rate)
+#define CH6_THROTTLE_KP     7           // throttle rate controller's P term (desired rate to acceleration or motor output)
+#define CH6_THROTTLE_KI     33          // throttle rate controller's I term (desired rate to acceleration or motor output)
+#define CH6_THROTTLE_KD     37          // throttle rate controller's D term (desired rate to acceleration or motor output)
+#define CH6_THR_ACCEL_KP    34          // accel based throttle controller's P term
+#define CH6_THR_ACCEL_KI    35          // accel based throttle controller's I term
+#define CH6_THR_ACCEL_KD    36          // accel based throttle controller's D term
+#define CH6_TOP_BOTTOM_RATIO 8          // upper/lower motor ratio (not used)
+#define CH6_RELAY           9           // switch relay on if ch6 high, off if low
+#define CH6_TRAVERSE_SPEED  10          // maximum speed to next way point (0 to 10m/s)
+#define CH6_NAV_KP          11          // navigation rate controller's P term (speed error to tilt angle)
+#define CH6_NAV_KI          20          // navigation rate controller's I term (speed error to tilt angle)
+#define CH6_LOITER_KP       12          // loiter distance controller's P term (position error to speed)
+#define CH6_LOITER_KI       27          // loiter distance controller's I term (position error to speed)
+#define CH6_HELI_EXTERNAL_GYRO 13       // TradHeli specific external tail gyro gain
+#define CH6_OPTFLOW_KP      17          // optical flow loiter controller's P term (position error to tilt angle)
+#define CH6_OPTFLOW_KI      18          // optical flow loiter controller's I term (position error to tilt angle)
+#define CH6_OPTFLOW_KD      19          // optical flow loiter controller's D term (position error to tilt angle)
+#define CH6_LOITER_RATE_KP  22          // loiter rate controller's P term (speed error to tilt angle)
+#define CH6_LOITER_RATE_KI  28          // loiter rate controller's I term (speed error to tilt angle)
+#define CH6_LOITER_RATE_KD  23          // loiter rate controller's D term (speed error to tilt angle)
+#define CH6_AHRS_YAW_KP     30          // ahrs's compass effect on yaw angle (0 = very low, 1 = very high)
+#define CH6_AHRS_KP         31          // accelerometer effect on roll/pitch angle (0=low)
+#define CH6_INAV_TC         32          // inertial navigation baro/accel and gps/accel time constant (1.5 = strong baro/gps correction on accel estimatehas very strong does not correct accel estimate, 7 = very weak correction)
 
-// Trad Heli specific
-#define CH6_HELI_EXTERNAL_GYRO 13
-
-// altitude controller
-#define CH6_THR_HOLD_KP 14
-#define CH6_Z_GAIN 15
-#define CH6_DAMP 16             // duplicate with CH6_YAW_RATE_KD
-
-// optical flow controller
-#define CH6_OPTFLOW_KP 17
-#define CH6_OPTFLOW_KI 18
-#define CH6_OPTFLOW_KD 19
-
-#define CH6_NAV_I 20
-#define CH6_LOITER_RATE_KP 22
-#define CH6_LOITER_RATE_KI 28
-#define CH6_LOITER_RATE_KD 23
-
-#define CH6_AHRS_YAW_KP 30
-#define CH6_AHRS_KP             31
-
-
-// nav byte mask
-// -------------
+// nav byte mask used with wp_verify_byte variable
+// -----------------------------------------------
 #define NAV_LOCATION 1
 #define NAV_ALTITUDE 2
 #define NAV_DELAY    4
@@ -207,12 +192,15 @@
 #define NO_COMMAND 0
 
 
+// Navigation modes held in wp_control variable
 #define LOITER_MODE 1
 #define WP_MODE 2
 #define CIRCLE_MODE 3
 #define NO_NAV_MODE 4
-#define TOY_MODE 5                      // THOR This mode defines the Virtual
-                                        // WP following mode
+
+// Yaw override behaviours - used for setting yaw_override_behaviour
+#define YAW_OVERRIDE_BEHAVIOUR_AT_NEXT_WAYPOINT     0   // auto pilot takes back yaw control at next waypoint
+#define YAW_OVERRIDE_BEHAVIOUR_AT_MISSION_RESTART   1   // auto pilot tkaes back control only when mission is restarted
 
 // TOY mixing options
 #define TOY_LOOKUP_TABLE 0
@@ -223,21 +211,22 @@
 // Waypoint options
 #define MASK_OPTIONS_RELATIVE_ALT               1
 #define WP_OPTION_ALT_CHANGE                    2
-#define WP_OPTION_YAW                                   4
+#define WP_OPTION_YAW                           4
 #define WP_OPTION_ALT_REQUIRED                  8
-#define WP_OPTION_RELATIVE                              16
+#define WP_OPTION_RELATIVE                      16
 //#define WP_OPTION_					32
 //#define WP_OPTION_					64
-#define WP_OPTION_NEXT_CMD                              128
+#define WP_OPTION_NEXT_CMD                      128
+
+// RTL state
+#define RTL_STATE_INITIAL_CLIMB     0
+#define RTL_STATE_RETURNING_HOME    1
+#define RTL_STATE_LOITERING_AT_HOME 2
+#define RTL_STATE_FINAL_DESCENT     3
+#define RTL_STATE_LAND              4
 
 //repeating events
-#define NO_REPEAT 0
-#define CH_5_TOGGLE 1
-#define CH_6_TOGGLE 2
-#define CH_7_TOGGLE 3
-#define CH_8_TOGGLE 4
 #define RELAY_TOGGLE 5
-#define STOP_REPEAT 10
 
 //  GCS Message ID's
 /// NOTE: to ensure we never block on sending MAVLink messages
@@ -258,7 +247,6 @@ enum ap_message {
     MSG_RAW_IMU1,
     MSG_RAW_IMU2,
     MSG_RAW_IMU3,
-    MSG_GPS_STATUS,
     MSG_GPS_RAW,
     MSG_SERVO_OUT,
     MSG_NEXT_WAYPOINT,
@@ -280,26 +268,31 @@ enum gcs_severity {
 
 //  Logging parameters
 #define TYPE_AIRSTART_MSG               0x00
-#define TYPE_GROUNDSTART_MSG    0x01
+#define TYPE_GROUNDSTART_MSG            0x01
 #define LOG_ATTITUDE_MSG                0x01
-#define LOG_GPS_MSG                             0x02
-#define LOG_MODE_MSG                    0X03
-#define LOG_CONTROL_TUNING_MSG  0X04
-#define LOG_NAV_TUNING_MSG              0X05
-#define LOG_PERFORMANCE_MSG             0X06
-#define LOG_RAW_MSG                             0x07
-#define LOG_CMD_MSG                             0x08
+#define LOG_GPS_MSG                     0x02
+#define LOG_MODE_MSG                    0x03
+#define LOG_CONTROL_TUNING_MSG          0x04
+#define LOG_NAV_TUNING_MSG              0x05
+#define LOG_PERFORMANCE_MSG             0x06
+#define LOG_RAW_MSG                     0x07
+#define LOG_CMD_MSG                     0x08
 #define LOG_CURRENT_MSG                 0x09
 #define LOG_STARTUP_MSG                 0x0A
 #define LOG_MOTORS_MSG                  0x0B
 #define LOG_OPTFLOW_MSG                 0x0C
 #define LOG_DATA_MSG                    0x0D
 #define LOG_PID_MSG                     0x0E
+#define LOG_ITERM_MSG                   0x0F
+#define LOG_DMP_MSG                     0x10
+#define LOG_INAV_MSG                    0x11
+#define LOG_CAMERA_MSG                  0x12
+#define LOG_ERROR_MSG                   0x13
 #define LOG_INDEX_MSG                   0xF0
 #define MAX_NUM_LOGS                    50
 
-#define MASK_LOG_ATTITUDE_FAST  (1<<0)
-#define MASK_LOG_ATTITUDE_MED   (1<<1)
+#define MASK_LOG_ATTITUDE_FAST          (1<<0)
+#define MASK_LOG_ATTITUDE_MED           (1<<1)
 #define MASK_LOG_GPS                    (1<<2)
 #define MASK_LOG_PM                     (1<<3)
 #define MASK_LOG_CTUN                   (1<<4)
@@ -311,33 +304,43 @@ enum gcs_severity {
 #define MASK_LOG_MOTORS                 (1<<10)
 #define MASK_LOG_OPTFLOW                (1<<11)
 #define MASK_LOG_PID                    (1<<12)
+#define MASK_LOG_ITERM                  (1<<13)
+#define MASK_LOG_INAV                   (1<<14)
+#define MASK_LOG_CAMERA                 (1<<15)
 
-// Waypoint Modes
-// ----------------
-#define ABS_WP 0
-#define REL_WP 1
+// DATA - event logging
+#define DATA_MAVLINK_FLOAT              1
+#define DATA_MAVLINK_INT32              2
+#define DATA_MAVLINK_INT16              3
+#define DATA_MAVLINK_INT8               4
+#define DATA_FAST_LOOP                  5
+#define DATA_MED_LOOP                   6
+#define DATA_AP_STATE                   7
+#define DATA_SIMPLE_BEARING             8
+#define DATA_INIT_SIMPLE_BEARING        9
+#define DATA_ARMED                      10
+#define DATA_DISARMED                   11
+#define DATA_AUTO_ARMED                 15
+#define DATA_TAKEOFF                    16
+#define DATA_DID_REACH_ALT              17
+#define DATA_LAND_COMPLETE              18
+#define DATA_LOST_GPS                   19
+#define DATA_LOST_COMPASS               20
+#define DATA_BEGIN_FLIP                 21
+#define DATA_END_FLIP                   22
+#define DATA_EXIT_FLIP                  23
+#define DATA_FLIP_ABORTED               24
+#define DATA_SET_HOME                   25
+#define DATA_SET_SIMPLE_ON              26
+#define DATA_SET_SIMPLE_OFF             27
+#define DATA_REACHED_ALT                28
+#define DATA_ASCENDING                  29
+#define DATA_DESCENDING                 30
+#define DATA_RTL_REACHED_ALT            31
 
-// Command Queues
-// ---------------
-#define COMMAND_MUST 0
-#define COMMAND_MAY 1
-#define COMMAND_NOW 2
-
-// Events
-// ------
-#define EVENT_WILL_REACH_WAYPOINT 1
-#define EVENT_SET_NEW_WAYPOINT_INDEX 2
-#define EVENT_LOADED_WAYPOINT 3
-#define EVENT_LOOP 4
-
-// Climb rate calculations
-#define ALTITUDE_HISTORY_LENGTH 8       //Number of (time,altitude) points to
-                                        // regress a climb rate from
-
+// battery monitoring macros
 #define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1024.0))*g.volt_div_ratio
 #define CURRENT_AMPS(x) ((x*(g.input_voltage/1024.0))-CURR_AMPS_OFFSET)*g.curr_amp_per_volt
-
-//#define BARO_FILTER_SIZE 8
 
 /* ************************************************************** */
 /* Expansion PIN's that people can use for various things. */
@@ -378,14 +381,10 @@ enum gcs_severity {
 #define AN14  68 // NC
 #define AN15  69 // NC
 
-#define RELAY_PIN 47
+#define RELAY_APM1_PIN 47
+#define RELAY_APM2_PIN 13
 
 #define PIEZO_PIN AN5           //Last pin on the back ADC connector
-
-
-
-// sonar
-//#define SonarToCm(x) (x*1.26)   // Sonar raw value to centimeters
 
 // RADIANS
 #define RADX100 0.000174532925
@@ -399,10 +398,8 @@ enum gcs_severity {
                             // WP
 #define WP_SIZE 15
 
-#define ONBOARD_PARAM_NAME_LENGTH 15
-
 // fence points are stored at the end of the EEPROM
-#define MAX_FENCEPOINTS 20
+#define MAX_FENCEPOINTS 6
 #define FENCE_WP_SIZE sizeof(Vector2l)
 #define FENCE_START_BYTE (EEPROM_MAX_ADDR-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
 
@@ -419,6 +416,16 @@ enum gcs_severity {
 #define CONFIG_IMU_OILPAN 1
 #define CONFIG_IMU_MPU6000 2
 
+// MPU6K Filter Rates
+# define MPU6K_DEFAULT_FILTER   0
+# define MPU6K_5HZ_FILTER       5
+# define MPU6K_10HZ_FILTER      10
+# define MPU6K_20HZ_FILTER      20
+# define MPU6K_42HZ_FILTER      42
+# define MPU6K_98HZ_FILTER      98
+
+
+
 // APM Hardware selection
 #define APM_HARDWARE_APM1 1
 #define APM_HARDWARE_APM2 2
@@ -426,12 +433,22 @@ enum gcs_severity {
 #define AP_BARO_BMP085    1
 #define AP_BARO_MS5611    2
 
-#define LOGGING_SIMPLE    1
-#define LOGGING_VERBOSE   2
+// Error message sub systems and error codes
+#define ERROR_SUBSYSTEM_MAIN                1
+#define ERROR_SUBSYSTEM_RADIO               2
+#define ERROR_SUBSYSTEM_COMPASS             3
+#define ERROR_SUBSYSTEM_OPTFLOW             4
+#define ERROR_SUBSYSTEM_FAILSAFE            5
+// general error codes
+#define ERROR_CODE_ERROR_RESOLVED           0
+#define ERROR_CODE_FAILED_TO_INITIALISE     1
+// subsystem specific error codes -- radio
+#define ERROR_CODE_RADIO_LATE_FRAME         2
+// subsystem specific error codes -- failsafe
+#define ERROR_CODE_FAILSAFE_THROTTLE  2
+#define ERROR_CODE_FAILSAFE_BATTERY   3
+#define ERROR_CODE_FAILSAFE_WATCHDOG  4
 
-// Channel Config selection
 
-#define CHANNEL_CONFIG_DEFAULT 1
-#define CHANNEL_CONFIG_CUSTOM  2
 
 #endif // _DEFINES_H

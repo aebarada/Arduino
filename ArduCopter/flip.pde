@@ -17,17 +17,19 @@ static int8_t flip_dir;
 
 void init_flip()
 {
-    if(do_flip == false) {
-        do_flip = true;
+    if(false == ap.do_flip) {
+        ap.do_flip = true;
         flip_state = 0;
         flip_dir = (ahrs.roll_sensor >= 0) ? 1 : -1;
+		Log_Write_Event(DATA_BEGIN_FLIP);
     }
 }
 
 void roll_flip()
 {
     // Pitch
-    g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
+    //g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
+    get_stabilize_pitch(g.rc_2.control_in);
 
     int32_t roll = ahrs.roll_sensor * flip_dir;
 
@@ -37,7 +39,7 @@ void roll_flip()
         if (roll < 4500) {
             // Roll control
             g.rc_1.servo_out = AAP_ROLL_OUT * flip_dir;
-            g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
+            set_throttle_out(g.rc_3.control_in + AAP_THR_INC, false);
         }else{
             flip_state++;
         }
@@ -45,8 +47,12 @@ void roll_flip()
 
     case 1:
         if((roll >= 4500) || (roll < -9000)) {
+		#if FRAME_CONFIG == HELI_FRAME
+			g.rc_1.servo_out = get_heli_rate_roll(40000 * flip_dir);
+		#else
             g.rc_1.servo_out = get_rate_roll(40000 * flip_dir);
-            g.rc_3.servo_out = g.rc_3.control_in - AAP_THR_DEC;
+		#endif // HELI_FRAME
+        set_throttle_out(g.rc_3.control_in - AAP_THR_DEC, false);
         }else{
             flip_state++;
             flip_timer = 0;
@@ -55,11 +61,13 @@ void roll_flip()
 
     case 2:
         if (flip_timer < 100) {
-            g.rc_1.servo_out = get_stabilize_roll(g.rc_1.control_in);
-            g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
+            //g.rc_1.servo_out = get_stabilize_roll(g.rc_1.control_in);
+            get_stabilize_roll(g.rc_1.control_in);
+            set_throttle_out(g.rc_3.control_in + AAP_THR_INC, false);
             flip_timer++;
         }else{
-            do_flip = false;
+        	Log_Write_Event(DATA_END_FLIP);
+            ap.do_flip = false;
             flip_state = 0;
         }
         break;

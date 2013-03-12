@@ -31,6 +31,39 @@ static int32_t read_barometer(void)
     return baro_filter.apply(barometer.get_altitude() * 100.0);
 }
 
+// return sonar altitude in centimeters
+static int16_t read_sonar(void)
+{
+#if CONFIG_SONAR == ENABLED
+    // exit immediately if sonar is disabled
+    if( !g.sonar_enabled ) {
+        sonar_alt_health = 0;
+        return 0;
+    }
+
+    int16_t temp_alt = sonar.read();
+
+    if(temp_alt >= sonar.min_distance && temp_alt <= sonar.max_distance * 0.70) {
+        if( sonar_alt_health < SONAR_ALT_HEALTH_MAX ) {
+            sonar_alt_health++;
+        }
+    }else{
+        sonar_alt_health = 0;
+    }
+
+ #if SONAR_TILT_CORRECTION == 1
+    // correct alt for angle of the sonar
+    float temp = cos_pitch_x * cos_roll_x;
+    temp = max(temp, 0.707);
+    temp_alt = (float)temp_alt * temp;
+ #endif
+
+    return temp_alt;
+#else
+    return 0;
+#endif
+}
+
 
 #endif // HIL_MODE != HIL_MODE_ATTITUDE
 
@@ -39,30 +72,44 @@ static void init_compass()
     compass.set_orientation(MAG_ORIENTATION);                                                   // set compass's orientation on aircraft
     if (!compass.init() || !compass.read()) {
         // make sure we don't pass a broken compass to DCM
-        Serial.println_P(PSTR("COMPASS INIT ERROR"));
+        cliSerial->println_P(PSTR("COMPASS INIT ERROR"));
+        Log_Write_Error(ERROR_SUBSYSTEM_COMPASS,ERROR_CODE_FAILED_TO_INITIALISE);
         return;
     }
     ahrs.set_compass(&compass);
+#if SECONDARY_DMP_ENABLED == ENABLED
+    ahrs2.set_compass(&compass);
+#endif
 }
 
 static void init_optflow()
 {
-#ifdef OPTFLOW_ENABLED
-    if( optflow.init(false) == false ) {
+#if OPTFLOW == ENABLED
+    if( optflow.init(false, &timer_scheduler, &spi_semaphore, &spi3_semaphore) == false ) {
         g.optflow_enabled = false;
-        SendDebug("\nFailed to Init OptFlow ");
+        cliSerial->print_P(PSTR("\nFailed to Init OptFlow "));
+        Log_Write_Error(ERROR_SUBSYSTEM_OPTFLOW,ERROR_CODE_FAILED_TO_INITIALISE);
+    }else{
+        // suspend timer while we set-up SPI communication
+        timer_scheduler.suspend_timer();
+
+        optflow.set_orientation(OPTFLOW_ORIENTATION);   // set optical flow sensor's orientation on aircraft
+        optflow.set_frame_rate(2000);                   // set minimum update rate (which should lead to maximum low light performance
+        optflow.set_resolution(OPTFLOW_RESOLUTION);     // set optical flow sensor's resolution
+        optflow.set_field_of_view(OPTFLOW_FOV);         // set optical flow sensor's field of view
+
+        // resume timer
+        timer_scheduler.resume_timer();
     }
-    optflow.set_orientation(OPTFLOW_ORIENTATION);                       // set optical flow sensor's orientation on aircraft
-    optflow.set_frame_rate(2000);                                                       // set minimum update rate (which should lead to maximum low light performance
-    optflow.set_resolution(OPTFLOW_RESOLUTION);                                 // set optical flow sensor's resolution
-    optflow.set_field_of_view(OPTFLOW_FOV);                                     // set optical flow sensor's field of view
-    // setup timed read of sensor
-    //timer_scheduler.register_process(&AP_OpticalFlow::read);
-#endif
+#endif      // OPTFLOW == ENABLED
 }
 
+// read_battery - check battery voltage and current and invoke failsafe if necessary
+// called at 10hz
+#define BATTERY_FS_COUNTER  100     // 100 iterations at 10hz is 10 seconds
 static void read_battery(void)
 {
+    static uint8_t low_battery_counter = 0;
 
     if(g.battery_monitoring == 0) {
         battery_voltage1 = 0;
@@ -70,37 +117,35 @@ static void read_battery(void)
     }
 
     if(g.battery_monitoring == 3 || g.battery_monitoring == 4) {
-        static AP_AnalogSource_Arduino bat_pin(BATTERY_PIN_1);
-        battery_voltage1 = BATTERY_VOLTAGE(bat_pin.read_average());
+        static AP_AnalogSource_Arduino batt_volt_pin(g.battery_volt_pin);
+        batt_volt_pin.set_pin(g.battery_volt_pin);
+        battery_voltage1 = BATTERY_VOLTAGE(batt_volt_pin.read_average());
     }
     if(g.battery_monitoring == 4) {
-        static AP_AnalogSource_Arduino current_pin(CURRENT_PIN_1);
-        current_amps1    = CURRENT_AMPS(current_pin.read_average());
+        static AP_AnalogSource_Arduino batt_curr_pin(g.battery_curr_pin);
+        batt_curr_pin.set_pin(g.battery_curr_pin);
+        current_amps1    = CURRENT_AMPS(batt_curr_pin.read_average());
         current_total1   += current_amps1 * 0.02778;            // called at 100ms on average, .0002778 is 1/3600 (conversion to hours)
     }
 
-#if BATTERY_EVENT == ENABLED
-    //if(battery_voltage < g.low_voltage)
-    //	low_battery_event();
-
-    if((battery_voltage1 < g.low_voltage) || (g.battery_monitoring == 4 && current_total1 > g.pack_capacity)) {
-        low_battery_event();
-
- #if COPTER_LEDS == ENABLED
-        if ( bitRead(g.copter_leds_mode, 3) ) {         // Only Activate if a battery is connected to avoid alarm on USB only
-            if (battery_voltage1 > 1) {
-                piezo_on();
-            }else{
-                piezo_off();
-            }
+    // check for low voltage or current if the low voltage check hasn't already been triggered
+    if (!ap.low_battery && ( battery_voltage1 < g.low_voltage || (g.battery_monitoring == 4 && current_total1 > g.pack_capacity))) {
+        low_battery_counter++;
+        if( low_battery_counter >= BATTERY_FS_COUNTER ) {
+            low_battery_counter = BATTERY_FS_COUNTER;   // ensure counter does not overflow
+            low_battery_event();
         }
-
-
-    }else if ( bitRead(g.copter_leds_mode, 3) ) {
-        piezo_off();
- #endif                // COPTER_LEDS
+    }else{
+        // reset low_battery_counter in case it was a temporary voltage dip
+        low_battery_counter = 0;
     }
-#endif         //BATTERY_EVENT
 }
 
-//v: 10.9453, a: 17.4023, mah: 8.2
+// read the receiver RSSI as an 8 bit number for MAVLink
+// RC_CHANNELS_SCALED message
+void read_receiver_rssi(void)
+{
+    RSSI_pin.set_pin(g.rssi_pin);
+    float ret = RSSI_pin.read();
+    receiver_rssi = constrain(ret, 0, 255);
+}

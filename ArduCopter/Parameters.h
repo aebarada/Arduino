@@ -17,7 +17,7 @@ public:
     // The increment will prevent old parameters from being used incorrectly
     // by newer code.
     //
-    static const uint16_t        k_format_version = 119;
+    static const uint16_t        k_format_version = 120;
 
     // The parameter software_type is set up solely for ground station use
     // and identifies the software type (eg ArduPilotMega versus
@@ -52,7 +52,8 @@ public:
         //
         k_param_format_version = 0,
         k_param_software_type,
-        k_param_ins,
+        k_param_ins_old,                        // *** Deprecated, remove with next eeprom number change
+        k_param_ins,                            // libraries/AP_InertialSensor variables
 
         // simulation
         k_param_sitl = 10,
@@ -68,6 +69,13 @@ public:
                                                         // Yaw Rate 1 = fast,
                                                         // 2 = med, 3 = slow
 
+        k_param_crosstrack_min_distance,
+        k_param_rssi_pin,
+        k_param_throttle_accel_enabled,
+        k_param_yaw_override_behaviour,
+        k_param_acro_trainer_enabled,
+        k_param_pilot_velocity_z_max,   // 28
+
         // 65: AP_Limits Library
         k_param_limits = 65,
         k_param_gpslock_limit,
@@ -81,11 +89,19 @@ public:
         k_param_heli_servo_2,
         k_param_heli_servo_3,
         k_param_heli_servo_4,
+		k_param_heli_pitch_ff,
+		k_param_heli_roll_ff,
+		k_param_heli_yaw_ff,
 
         //
         // 90: Motors
         //
         k_param_motors = 90,
+
+        //
+        // 100: Inertial Nav
+        //
+        k_param_inertial_nav = 100,
 
         // 110: Telemetry control
         //
@@ -99,8 +115,8 @@ public:
         //
         // 140: Sensor parameters
         //
-        k_param_imu = 140, // sensor calibration
-        k_param_battery_monitoring,
+        k_param_imu = 140, // deprecated - can be deleted
+        k_param_battery_monitoring = 141,
         k_param_volt_div_ratio,
         k_param_curr_amp_per_volt,
         k_param_input_voltage,
@@ -122,10 +138,10 @@ public:
         //
         // 160: Navigation parameters
         //
-        k_param_RTL_altitude = 160,
+        k_param_rtl_altitude = 160,
         k_param_crosstrack_gain,
-        k_param_auto_land_timeout,
-        k_param_rtl_approach_alt,
+        k_param_rtl_loiter_time,
+        k_param_rtl_alt_final,
         k_param_tilt_comp, //164
 
 
@@ -135,6 +151,12 @@ public:
         k_param_camera = 165,
         k_param_camera_mount,
         k_param_camera_mount2,
+
+        //
+        // Batery monitoring parameters
+        //
+        k_param_battery_volt_pin = 168,
+        k_param_battery_curr_pin,   // 169
 
         //
         // 170: Radio settings
@@ -151,15 +173,17 @@ public:
         k_param_rc_11,
         k_param_throttle_min,
         k_param_throttle_max,
-        k_param_throttle_fs_enabled,
-        k_param_throttle_fs_action,
-        k_param_throttle_fs_value,
+        k_param_failsafe_throttle,
+        k_param_throttle_fs_action,     // remove
+        k_param_failsafe_throttle_value,
         k_param_throttle_cruise,
         k_param_esc_calibrate,
         k_param_radio_tuning,
         k_param_radio_tuning_high,
         k_param_radio_tuning_low,
         k_param_rc_speed = 192,
+        k_param_failsafe_battery_enabled,
+        k_param_throttle_mid, // 194
 
         //
         // 200: flight modes
@@ -178,18 +202,19 @@ public:
         k_param_waypoint_mode = 210, // remove
         k_param_command_total,
         k_param_command_index,
-        k_param_command_nav_index,
+        k_param_command_nav_index,   // remove
         k_param_waypoint_radius,
-        k_param_loiter_radius,
+        k_param_circle_radius,
         k_param_waypoint_speed_max,
+        k_param_land_speed,
+        k_param_auto_velocity_z_min,
+        k_param_auto_velocity_z_max, // 219
 
         //
         // 220: PI/D Controllers
         //
-        k_param_stabilize_d_schedule = 219,
-        k_param_stabilize_d = 220,
-        k_param_acro_p,
-        k_param_axis_lock_p,
+        k_param_acro_p = 221,
+        k_param_axis_lock_p,    // remove
         k_param_pid_rate_roll,
         k_param_pid_rate_pitch,
         k_param_pid_rate_yaw,
@@ -206,6 +231,9 @@ public:
         k_param_pid_throttle,
         k_param_pid_optflow_roll,
         k_param_pid_optflow_pitch,
+        k_param_acro_balance_roll,      // scalar (not PID)
+        k_param_acro_balance_pitch,     // scalar (not PID)
+        k_param_pid_throttle_accel, // 241
 
         // 254,255: reserved
     };
@@ -220,7 +248,7 @@ public:
     AP_Int8         serial3_baud;
     AP_Int8         telem_delay;
 
-    AP_Int16        RTL_altitude;
+    AP_Int16        rtl_altitude;
     AP_Int8         sonar_enabled;
     AP_Int8         sonar_type;       // 0 = XL, 1 = LV,
                                       // 2 = XLL (XL with 10m range)
@@ -230,41 +258,49 @@ public:
     AP_Float        volt_div_ratio;
     AP_Float        curr_amp_per_volt;
     AP_Float        input_voltage;
-    AP_Int16        pack_capacity;              // Battery pack capacity less
-                                                // reserve
+    AP_Int16        pack_capacity;              // Battery pack capacity less reserve
+    AP_Int8         failsafe_battery_enabled;   // battery failsafe enabled
+
     AP_Int8         compass_enabled;
     AP_Int8         optflow_enabled;
     AP_Float        low_voltage;
     AP_Int8         super_simple;
-    AP_Int16        rtl_approach_alt;
+    AP_Int16        rtl_alt_final;
     AP_Int8         tilt_comp;
     AP_Int8         axis_enabled;
     AP_Int8         copter_leds_mode;           // Operating mode of LED
                                                 // lighting system
 
-
+    AP_Int8         battery_volt_pin;
+    AP_Int8         battery_curr_pin;
+    AP_Int8         rssi_pin;
+    AP_Int8         throttle_accel_enabled;      // enable/disable accel based throttle controller
+    AP_Int8         yaw_override_behaviour;     // controls when autopilot takes back normal control of yaw after pilot overrides
 
     // Waypoints
     //
-    AP_Int8         waypoint_mode;
     AP_Int8         command_total;
     AP_Int8         command_index;
-    AP_Int8         command_nav_index;
     AP_Int16        waypoint_radius;
-    AP_Int16        loiter_radius;
+    AP_Int16        circle_radius;
     AP_Int16        waypoint_speed_max;
     AP_Float        crosstrack_gain;
-    AP_Int32        auto_land_timeout;
+    AP_Int16 		crosstrack_min_distance;
+    AP_Int32        rtl_loiter_time;
+    AP_Int16        land_speed;
+    AP_Int16        auto_velocity_z_min;         // minimum vertical velocity (i.e. maximum descent) the autopilot may request
+    AP_Int16        auto_velocity_z_max;         // maximum vertical velocity the autopilot may request
+    AP_Int16        pilot_velocity_z_max;        // maximum vertical velocity the pilot may request
 
 
     // Throttle
     //
     AP_Int16        throttle_min;
     AP_Int16        throttle_max;
-    AP_Int8         throttle_fs_enabled;
-    AP_Int8         throttle_fs_action;
-    AP_Int16        throttle_fs_value;
+    AP_Int8         failsafe_throttle;
+    AP_Int16        failsafe_throttle_value;
     AP_Int16        throttle_cruise;
+    AP_Int16        throttle_mid;
 
     // Flight modes
     //
@@ -279,9 +315,7 @@ public:
     // Misc
     //
     AP_Int16        log_bitmask;
-    AP_Int16        log_last_filenumber;        // *** Deprecated - remove
-                                                // with next eeprom number
-                                                // change
+
     AP_Int8         toy_yaw_rate;                               // THOR The
                                                                 // Yaw Rate 1
                                                                 // = fast, 2 =
@@ -297,18 +331,10 @@ public:
 
 #if FRAME_CONFIG ==     HELI_FRAME
     // Heli
-    RC_Channel        heli_servo_1, heli_servo_2, heli_servo_3, heli_servo_4;   //
-                                                                                // servos
-                                                                                // for
-                                                                                // swash
-                                                                                // plate
-                                                                                // and
-                                                                                // tail
-#endif
-
-    // Camera
-#if CAMERA == ENABLED
-    AP_Camera        camera;
+    RC_Channel        heli_servo_1, heli_servo_2, heli_servo_3, heli_servo_4;   // servos for swash plate and tail
+	AP_Float		heli_pitch_ff;												// pitch rate feed-forward
+	AP_Float		heli_roll_ff;												// roll rate feed-forward
+	AP_Float		heli_yaw_ff;												// yaw rate feed-forward																			
 #endif
 
     // RC channels
@@ -327,13 +353,13 @@ public:
 #endif
     AP_Int16                rc_speed; // speed of fast RC Channels in Hz
 
-    AP_Float                stabilize_d;
-    AP_Float                stabilize_d_schedule;
+    // Acro parameters
+    AP_Float                acro_p;
+    AP_Int16                acro_balance_roll;
+    AP_Int16                acro_balance_pitch;
+    AP_Int8                 acro_trainer_enabled;
 
     // PI/D controllers
-    AP_Float                acro_p;
-    AP_Float                axis_lock_p;
-
     AC_PID                  pid_rate_roll;
     AC_PID                  pid_rate_pitch;
     AC_PID                  pid_rate_yaw;
@@ -343,6 +369,7 @@ public:
     AC_PID                  pid_nav_lon;
 
     AC_PID                  pid_throttle;
+    AC_PID                  pid_throttle_accel;
     AC_PID                  pid_optflow_roll;
     AC_PID                  pid_optflow_pitch;
 
@@ -358,53 +385,54 @@ public:
     Parameters() :
 
 #if FRAME_CONFIG ==     HELI_FRAME
-        heli_servo_1                        (CH_1),
-        heli_servo_2                        (CH_2),
-        heli_servo_3                        (CH_3),
-        heli_servo_4                        (CH_4),
+        heli_servo_1        (CH_1),
+        heli_servo_2        (CH_2),
+        heli_servo_3        (CH_3),
+        heli_servo_4        (CH_4),
 #endif
 
-        rc_1                                        (CH_1),
-        rc_2                                        (CH_2),
-        rc_3                                        (CH_3),
-        rc_4                                        (CH_4),
-        rc_5                                        (CH_5),
-        rc_6                                        (CH_6),
-        rc_7                                        (CH_7),
-        rc_8                                        (CH_8),
+        rc_1                (CH_1),
+        rc_2                (CH_2),
+        rc_3                (CH_3),
+        rc_4                (CH_4),
+        rc_5                (CH_5),
+        rc_6                (CH_6),
+        rc_7                (CH_7),
+        rc_8                (CH_8),
 #if MOUNT == ENABLED
-        rc_10                                       (CH_10),
-        rc_11                                       (CH_11),
+        rc_10               (CH_10),
+        rc_11               (CH_11),
 #endif
 
         // PID controller	initial P	        initial I		    initial D
         //          initial imax
         //-----------------------------------------------------------------------------------------------------
-        pid_rate_roll       (RATE_ROLL_P,       RATE_ROLL_I,        RATE_ROLL_D,        RATE_ROLL_IMAX * 100),
-        pid_rate_pitch      (RATE_PITCH_P,      RATE_PITCH_I,       RATE_PITCH_D,       RATE_PITCH_IMAX * 100),
-        pid_rate_yaw        (RATE_YAW_P,        RATE_YAW_I,         RATE_YAW_D,         RATE_YAW_IMAX * 100),
+        pid_rate_roll           (RATE_ROLL_P,           RATE_ROLL_I,            RATE_ROLL_D,            RATE_ROLL_IMAX * 100),
+        pid_rate_pitch          (RATE_PITCH_P,          RATE_PITCH_I,           RATE_PITCH_D,           RATE_PITCH_IMAX * 100),
+        pid_rate_yaw            (RATE_YAW_P,            RATE_YAW_I,             RATE_YAW_D,             RATE_YAW_IMAX * 100),
 
         pid_loiter_rate_lat     (LOITER_RATE_P,         LOITER_RATE_I,          LOITER_RATE_D,          LOITER_RATE_IMAX * 100),
         pid_loiter_rate_lon     (LOITER_RATE_P,         LOITER_RATE_I,          LOITER_RATE_D,          LOITER_RATE_IMAX * 100),
 
-        pid_nav_lat                     (NAV_P,                         NAV_I,                          NAV_D,                          NAV_IMAX * 100),
-        pid_nav_lon                     (NAV_P,                         NAV_I,                          NAV_D,                          NAV_IMAX * 100),
+        pid_nav_lat             (NAV_P,                 NAV_I,                  NAV_D,                  NAV_IMAX * 100),
+        pid_nav_lon             (NAV_P,                 NAV_I,                  NAV_D,                  NAV_IMAX * 100),
 
-        pid_throttle            (THROTTLE_P,            THROTTLE_I,                     THROTTLE_D,                     THROTTLE_IMAX),
+        pid_throttle            (THROTTLE_P,            THROTTLE_I,             THROTTLE_D,             THROTTLE_IMAX),
+        pid_throttle_accel      (THROTTLE_ACCEL_P,      THROTTLE_ACCEL_I,       THROTTLE_ACCEL_D,       THROTTLE_ACCEL_IMAX),
         pid_optflow_roll        (OPTFLOW_ROLL_P,        OPTFLOW_ROLL_I,         OPTFLOW_ROLL_D,         OPTFLOW_IMAX * 100),
         pid_optflow_pitch       (OPTFLOW_PITCH_P,       OPTFLOW_PITCH_I,        OPTFLOW_PITCH_D,        OPTFLOW_IMAX * 100),
 
         // PI controller	initial P			initial I			initial
         // imax
         //----------------------------------------------------------------------
-        pi_loiter_lat           (LOITER_P,                      LOITER_I,                       LOITER_IMAX * 100),
-        pi_loiter_lon           (LOITER_P,                      LOITER_I,                       LOITER_IMAX * 100),
+        pi_loiter_lat           (LOITER_P,              LOITER_I,               LOITER_IMAX * 100),
+        pi_loiter_lon           (LOITER_P,              LOITER_I,               LOITER_IMAX * 100),
 
         pi_stabilize_roll       (STABILIZE_ROLL_P,      STABILIZE_ROLL_I,       STABILIZE_ROLL_IMAX * 100),
         pi_stabilize_pitch      (STABILIZE_PITCH_P,     STABILIZE_PITCH_I,      STABILIZE_PITCH_IMAX * 100),
         pi_stabilize_yaw        (STABILIZE_YAW_P,       STABILIZE_YAW_I,        STABILIZE_YAW_IMAX * 100),
 
-        pi_alt_hold                     (ALT_HOLD_P,            ALT_HOLD_I,                     ALT_HOLD_IMAX)
+        pi_alt_hold             (ALT_HOLD_P,            ALT_HOLD_I,             ALT_HOLD_IMAX)
     {
     }
 };

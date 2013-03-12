@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include "DataFlash.h"
 #include <SPI.h>
+#include <AP_Semaphore.h>
 
 #define DF_PAGE_SIZE 512
 #define DF_NUM_PAGES 4096
@@ -121,5 +122,4 @@ void DataFlash_APM1::ChipErase(void (*delay_cb)(unsigned long))
 	}
 }
 
-// make one instance for the user to use
-DataFlash_APM1::DataFlash_APM1() {}
+

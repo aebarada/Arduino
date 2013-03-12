@@ -15,6 +15,7 @@
 #include <SITL.h>
 #include <AP_GPS.h>
 #include <AP_GPS_UBLOX.h>
+#include <sys/ioctl.h>
 #include "desktop.h"
 #include "util.h"
 
@@ -37,7 +38,7 @@ static uint8_t gps_delay;
 // state of GPS emulation
 static struct {
 	/* pipe emulating UBLOX GPS serial stream */
-	int gps_fd;
+	int gps_fd, client_fd;
 	uint32_t last_update; // milliseconds
 } gps_state;
 
@@ -46,6 +47,17 @@ static struct {
  */
 ssize_t sitl_gps_read(int fd, void *buf, size_t count)
 {
+#ifdef FIONREAD
+	// use FIONREAD to get exact value if possible
+	int num_ready;
+	while (ioctl(fd, FIONREAD, &num_ready) == 0 && num_ready > 256) {
+		// the pipe is filling up - drain it
+		uint8_t tmp[128];
+		if (read(fd, tmp, sizeof(tmp)) != sizeof(tmp)) {
+			break;
+		}
+	}
+#endif
 	return read(fd, buf, count);
 }
 
@@ -55,12 +67,16 @@ ssize_t sitl_gps_read(int fd, void *buf, size_t count)
 int sitl_gps_pipe(void)
 {
 	int fd[2];
+	if (gps_state.client_fd != 0) {
+		return gps_state.client_fd;
+	}
 	pipe(fd);
-	gps_state.gps_fd = fd[1];
+	gps_state.gps_fd    = fd[1];
+	gps_state.client_fd = fd[0];
 	gps_state.last_update = millis();
 	set_nonblocking(gps_state.gps_fd);
 	set_nonblocking(fd[0]);
-	return fd[0];
+	return gps_state.client_fd;
 }
 
 
@@ -127,9 +143,29 @@ void sitl_update_gps(double latitude, double longitude, float altitude,
 		uint32_t	speed_accuracy;
 		uint32_t	heading_accuracy;
 	} velned;
+	struct ubx_nav_solution {
+		uint32_t time;
+		int32_t time_nsec;
+		int16_t week;
+		uint8_t fix_type;
+		uint8_t fix_status;
+		int32_t ecef_x;
+		int32_t ecef_y;
+		int32_t ecef_z;
+		uint32_t position_accuracy_3d;
+		int32_t ecef_x_velocity;
+		int32_t ecef_y_velocity;
+		int32_t ecef_z_velocity;
+		uint32_t speed_accuracy;
+		uint16_t position_DOP;
+		uint8_t res;
+		uint8_t satellites;
+		uint32_t res2;
+	} sol;
         const uint8_t MSG_POSLLH = 0x2;
 	const uint8_t MSG_STATUS = 0x3;
 	const uint8_t MSG_VELNED = 0x12;
+        const uint8_t MSG_SOL = 0x6;
 	struct gps_data d;
 
 	// 5Hz, to match the real UBlox config in APM
@@ -191,6 +227,11 @@ void sitl_update_gps(double latitude, double longitude, float altitude,
 	velned.speed_accuracy = 2;
 	velned.heading_accuracy = 4;
 
+	memset(&sol, 0, sizeof(sol));
+	sol.fix_type = d.have_lock?3:0;
+	sol.fix_status = 221;
+	sol.satellites = d.have_lock?10:3;
+
 	if (gps_state.gps_fd == 0) {
 		return;
 	}
@@ -198,4 +239,5 @@ void sitl_update_gps(double latitude, double longitude, float altitude,
 	gps_send(MSG_POSLLH, (uint8_t*)&pos, sizeof(pos));
 	gps_send(MSG_STATUS, (uint8_t*)&status, sizeof(status));
 	gps_send(MSG_VELNED, (uint8_t*)&velned, sizeof(velned));
+	gps_send(MSG_SOL,    (uint8_t*)&sol, sizeof(sol));
 }

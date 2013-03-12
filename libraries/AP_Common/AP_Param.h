@@ -19,7 +19,7 @@
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 
-#define AP_MAX_NAME_SIZE 15
+#define AP_MAX_NAME_SIZE 16
 #define AP_NESTED_GROUPS_ENABLED
 
 // a variant of offsetof() to work around C++ restrictions.
@@ -66,7 +66,7 @@ public:
     struct GroupInfo {
         uint8_t type; // AP_PARAM_*
         uint8_t idx;  // identifier within the group
-        const char name[AP_MAX_NAME_SIZE];
+        const char name[AP_MAX_NAME_SIZE+1];
         uintptr_t offset; // offset within the object
         union {
             const struct GroupInfo *group_info;
@@ -75,7 +75,7 @@ public:
     };
     struct Info {
         uint8_t type; // AP_PARAM_*
-        const char name[AP_MAX_NAME_SIZE];
+        const char name[AP_MAX_NAME_SIZE+1];
         uint8_t key; // k_param_*
         void *ptr;    // pointer to the variable in memory
         union {
@@ -122,6 +122,8 @@ public:
     ///
     void copy_name(char *buffer, size_t bufferSize, bool force_scalar=false);
 
+    void copy_name_token(const ParamToken *token, char *buffer, size_t bufferSize, bool force_scalar=false);
+
     /// Find a variable by name.
     ///
     /// If the variable has no name, it cannot be found by this interface.
@@ -131,6 +133,15 @@ public:
     ///                         it does not exist.
     ///
     static AP_Param * find(const char *name, enum ap_var_type *ptype);
+
+    /// Find a variable by index.
+    ///
+    ///
+    /// @param  idx             The index of the variable
+    /// @return                 A pointer to the variable, or NULL if
+    ///                         it does not exist.
+    ///
+    static AP_Param * find_by_index(uint16_t idx, enum ap_var_type *ptype);
 
     /// Save the current value of the variable to EEPROM.
     ///
@@ -234,13 +245,17 @@ private:
                                     uint8_t                     vindex,
                                     uint8_t                     group_base,
                                     uint8_t                     group_shift,
-                                    uint8_t *                   group_element,
+                                    uint32_t *                  group_element,
                                     const struct GroupInfo **   group_ret,
                                     uint8_t *                   idx);
     const struct Info *         find_var_info(
-                                    uint8_t *                 group_element,
+                                    uint32_t *                group_element,
                                     const struct GroupInfo ** group_ret,
                                     uint8_t *                 idx);
+    const struct Info *			find_var_info_token(const ParamToken *token,
+                                                    uint32_t *                 group_element,
+                                                    const struct GroupInfo **  group_ret,
+                                                    uint8_t *                  idx);
     static const struct Info *  find_by_header_group(
                                     struct Param_header phdr, void **ptr,
                                     uint8_t vindex,

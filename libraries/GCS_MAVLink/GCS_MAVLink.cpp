@@ -15,6 +15,10 @@ version 2.1 of the License, or (at your option) any later version.
 #include <AP_Common.h>
 #include <GCS_MAVLink.h>
 
+#ifdef MAVLINK_SEPARATE_HELPERS
+#include "include/mavlink/v1.0/mavlink_helpers.h"
+#endif
+
 
 BetterStream	*mavlink_comm_0_port;
 BetterStream	*mavlink_comm_1_port;
@@ -46,4 +50,12 @@ uint8_t mav_var_type(enum ap_var_type t)
     return MAVLINK_TYPE_FLOAT;
 }
 
+
+static const uint8_t mavlink_message_crc_progmem[256] PROGMEM = MAVLINK_MESSAGE_CRCS;
+
+// return CRC byte for a mavlink message ID
+uint8_t mavlink_get_message_crc(uint8_t msgid)
+{
+	return pgm_read_byte(&mavlink_message_crc_progmem[msgid]);
+}
 

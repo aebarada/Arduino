@@ -144,8 +144,7 @@ static void sitl_fdm_input(void)
 }
 
 // used for noise generation in the ADC code
-// motor speed in revolutions per second
-float sitl_motor_speed[4] = {0,0,0,0};
+bool sitl_motors_on;
 
 /*
   send RC outputs to simulator
@@ -169,14 +168,18 @@ static void sitl_simulator_output(void)
 		for (i=0; i<11; i++) {
 			(*reg[i]) = 1000*2;
 		}
-		if (!desktop_state.quadcopter) {
+		if (desktop_state.vehicle == ArduPlane) {
 			(*reg[0]) = (*reg[1]) = (*reg[3]) = 1500*2;
+			(*reg[7]) = 1800*2;
+		}
+		if (desktop_state.vehicle == APMrover2) {
+			(*reg[0]) = (*reg[1]) = (*reg[2]) = (*reg[3]) = 1500*2;
 			(*reg[7]) = 1800*2;
 		}
 	}
 
 	// output at chosen framerate
-	if (millis() - last_update < 1000/desktop_state.framerate) {
+	if (last_update != 0 && millis() - last_update < 1000/desktop_state.framerate) {
 		return;
 	}
 	last_update = millis();
@@ -189,19 +192,27 @@ static void sitl_simulator_output(void)
 		}
 	}
 
-	if (!desktop_state.quadcopter) {
+	if (desktop_state.vehicle == ArduPlane) {
 		// add in engine multiplier
 		if (control.pwm[2] > 1000) {
 			control.pwm[2] = ((control.pwm[2]-1000) * sitl.engine_mul) + 1000;
 			if (control.pwm[2] > 2000) control.pwm[2] = 2000;
 		}
-
-		// 400kV motor, 16V
-		sitl_motor_speed[0] = ((control.pwm[2]-1000)/1000.0) * 400 * 16 / 60.0;
+		sitl_motors_on = ((control.pwm[2]-1000)/1000.0) > 0;
+	} else if (desktop_state.vehicle == APMrover2) {
+		// add in engine multiplier
+		if (control.pwm[2] != 1500) {
+			control.pwm[2] = ((control.pwm[2]-1500) * sitl.engine_mul) + 1500;
+			if (control.pwm[2] > 2000) control.pwm[2] = 2000;
+			if (control.pwm[2] < 1000) control.pwm[2] = 1000;
+		}
+		sitl_motors_on = ((control.pwm[2]-1500)/500.0) != 0;
 	} else {
-		// 850kV motor, 16V
+		sitl_motors_on = false;
 		for (i=0; i<4; i++) {
-			sitl_motor_speed[i] = ((control.pwm[i]-1000)/1000.0) * 850 * 12 / 60.0;
+			if ((control.pwm[i]-1000)/1000.0 > 0) {
+				sitl_motors_on = true;
+			}
 		}
 	}
 
@@ -228,13 +239,15 @@ static void sitl_simulator_output(void)
 static void timer_handler(int signum)
 {
 	static uint32_t last_update_count;
-	static bool running;
+	static bool in_timer;
 
-	if (running) {
+	if (in_timer || _interrupts_are_blocked()) {
 		return;
 	}
-	running = true;
+	uint8_t oldSREG = SREG;
 	cli();
+
+	in_timer = true;
 
 #ifndef __CYGWIN__
 	/* make sure we die if our parent dies */
@@ -243,22 +256,19 @@ static void timer_handler(int signum)
 	}
 #else
     
-    static uint16_t count = 0;
-    static uint32_t last_report;
+	static uint16_t count = 0;
+	static uint32_t last_report;
         
     	count++;
-		if (millis() - last_report > 1000) {
-			printf("TH %u cps\n", count);
-			count = 0;
-			last_report = millis();
-		}
+	if (millis() - last_report > 1000) {
+		printf("TH %u cps\n", count);
+		count = 0;
+		last_report = millis();
+	}
 #endif
 
 	/* check for packet from flight sim */
 	sitl_fdm_input();
-
-	// trigger all timers
-	timer_scheduler.run();
 
 	// trigger RC input
 	if (isr_registry._registry[ISR_REGISTRY_TIMER4_CAPT]) {
@@ -270,14 +280,16 @@ static void timer_handler(int signum)
 
 	if (update_count == 0) {
 		sitl_update_gps(0, 0, 0, 0, 0, false);
-		sei();
-		running = false;
+		timer_scheduler.run();
+		SREG = oldSREG;
+		in_timer = false;
 		return;
 	}
 
 	if (update_count == last_update_count) {
-		sei();
-		running = false;
+		timer_scheduler.run();
+		SREG = oldSREG;
+		in_timer = false;
 		return;
 	}
 	last_update_count = update_count;
@@ -296,8 +308,12 @@ static void timer_handler(int signum)
 	// so the ADC code doesn't get stuck
 	ADCSRA &= ~_BV(ADSC);
 
-	sei();
-	running = false;
+	// trigger all APM timers. We do this last as it can re-enable
+	// interrupts, which can lead to recursion
+	timer_scheduler.run();
+
+	SREG = oldSREG;
+	in_timer = false;
 }
 
 

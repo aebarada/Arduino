@@ -23,7 +23,7 @@ void set_recovery_home_alt() {
             return_altitude_cm_ahl = (uint32_t) (home.alt + (100 * (uint16_t) ((amax_meters_ahl - amin_meters_ahl) / 2)));
         }
     } else {
-        return_altitude_cm_ahl = (uint32_t) (home.alt + g.RTL_altitude*100);
+        return_altitude_cm_ahl = (uint32_t) (home.alt + g.rtl_altitude);
     }
     // final sanity check
     // if our return is less than 4 meters from ground, set it to 4m, to clear "people" height.
@@ -136,7 +136,7 @@ static void limits_loop() {
         if (motors.armed() && limits.enabled() && !limits.mods_triggered) {
 
             // All clear.
-            if (limits.debug()) gcs_send_text(SEVERITY_LOW, "Limits - All Clear");
+	    if (limits.debug()) gcs_send_text_P(SEVERITY_LOW, PSTR("Limits - All Clear"));
             limits.last_clear = millis();
         }
 
@@ -156,9 +156,9 @@ static void limits_loop() {
 #endif
 
         if (limits.debug()) {
-            if (limits.mods_triggered & LIMIT_GPSLOCK) gcs_send_text(SEVERITY_LOW, "!GPSLock");
-            if (limits.mods_triggered & LIMIT_GEOFENCE) gcs_send_text(SEVERITY_LOW, "!Geofence");
-            if (limits.mods_triggered & LIMIT_ALTITUDE) gcs_send_text(SEVERITY_LOW, "!Altitude");
+		if (limits.mods_triggered & LIMIT_GPSLOCK) gcs_send_text_P(SEVERITY_LOW, PSTR("!GPSLock"));
+		if (limits.mods_triggered & LIMIT_GEOFENCE) gcs_send_text_P(SEVERITY_LOW, PSTR("!Geofence"));
+		if (limits.mods_triggered & LIMIT_ALTITUDE) gcs_send_text_P(SEVERITY_LOW, PSTR("!Altitude"));
         }
 
         // If the motors are not armed, we have triggered pre-arm checks. Do nothing
@@ -269,7 +269,7 @@ static void limits_loop() {
 
                 //set_recovery_home_alt();
                 set_mode(POSITION);
-                throttle_mode = THROTTLE_AUTO;
+                set_throttle_mode(THROTTLE_AUTO);
                 limits.last_action = millis();
                 gcs_send_message(MSG_LIMITS_STATUS);
                 break;
