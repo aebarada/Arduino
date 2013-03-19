@@ -15,13 +15,11 @@ void setup() {
   pinMode(30, INPUT);
   pinMode(32, INPUT); 
   pinMode(34, INPUT);
-
+  BuildDegree();
 }
 
 // the loop routine runs over and over again forever:
 void loop() {
-  
-  BuildDegree();
   int Y = findY();
   int Q = findQ();
   int degree = DegreeFinder[Y][Q];
@@ -30,70 +28,19 @@ void loop() {
 }
 
 int findY(){
-  int x = 0;
-  int Y0 = 0, Y1 = 0, Y2 = 0, Y3 = 0, Y4 = 0, Y5 = 0, Y6 = 0, Y7 = 0;
   //read the pushbutton value into a variable
   int A2 = digitalRead(22);
   int A1 = digitalRead(24);
   int A0 = digitalRead(26);
-  
-  int Q0 = digitalRead(28);
-  int Q1 = digitalRead(30);
-  int Q2 = digitalRead(32);
-  int Q3 = digitalRead(34);
   
   //print out the value of the pushbutton
   Serial.print(A2);
   Serial.print(A1);
   Serial.print(A0);
   Serial.println();
+  Serial.print((A2 << 2) | (A1 << 1) | A0);
   
-  if(!A2)
-  {
-    if(!A1){
-      if(!A0){
-        Y0 = 1;//000
-        x = 0;
-      }  
-      else{
-       Y1 = 1; //001
-       x=1;
-      }
-    }
-    else{
-      if(!A0){
-        Y2 = 1;//010
-        x=2;
-      }  
-      else{
-       Y3 = 1; //011
-       x=3;
-      }
-    }
-  }
-  else{
-     if(!A1){
-      if(!A0){
-        Y4 = 1;//100
-        x=4;
-      }  
-      else{
-       Y5 = 1; //101
-       x=5;
-      }
-    }
-    else{
-      if(!A0){
-        Y6 = 1;//110
-        x=6;
-      }  
-      else{
-       Y7 = 1; //111
-       x=7;
-      }
-    }
-  }
- return x;
+  return (A2 << 2) | (A1 << 1) | A0;
 }
 
 int findQ(){
