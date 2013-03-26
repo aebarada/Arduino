@@ -22,18 +22,94 @@ static uint8_t      apm_mav_system; // system ID
 static uint8_t      apm_mav_component; // component ID
 FastSerialPort0(Serial); // for printing debug information to serial monitor
 FastSerialPort3(Serial3); // connected to the APM
+int DegreeFinder[8][4];
+float lat = 0;
+float lon = 0;
+float z = 0;
+float yaw = 0;
+int degree = 0;
 
 
 // Initializes the serial ports
 void setup() {
 	Serial.begin(115200);
 	Serial3.begin(57600);
+        pinMode(22, INPUT);
+        pinMode(24, INPUT);
+        pinMode(26, INPUT);
+        pinMode(28, INPUT);
+        pinMode(30, INPUT);
+        pinMode(32, INPUT); 
+        pinMode(34, INPUT);
+        BuildDegree();
 }
 
 void loop() {
-        //requestData();
+        requestData();
 	comm_receive();
-        delay(100);
+        doMath();
+        checkCollision();
+        setWaypoint();
+        //delay(100);
+}
+
+void checkCollision(){
+      if(degree > 315 && degree < 45){
+        // check sensors on front arm
+      } else if(degree > 45 && degree < 135){
+        // check sensors on right arm
+      } else if(degree > 135 && degree < 225){
+        // check sensors on back arm
+      } else {
+        //check sensor on left arm
+      }
+}
+
+void doMath(){
+     int Y = findY();
+     int Q = findQ();
+     degree = DegreeFinder[Y][Q];
+     int dir = yaw + degree;
+     lat = lat + 1*cos(dir);
+     lon = lon + 1*sin(dir);
+}
+
+void setWaypoint(){
+/**
+ * @brief Send a mission_item message
+ * @param chan MAVLink channel to send the message
+ *
+ * @param target_system System ID
+ * @param target_component Component ID
+ * @param seq Sequence
+ * @param frame The coordinate system of the MISSION. see MAV_FRAME in mavlink_types.h
+ * @param command The scheduled action for the MISSION. see MAV_CMD in common.xml MAVLink specs
+ * @param current false:0, true:1
+ * @param autocontinue autocontinue to next wp
+ * @param param1 PARAM1 / For NAV command MISSIONs: Radius in which the MISSION is accepted as reached, in meters
+ * @param param2 PARAM2 / For NAV command MISSIONs: Time that the MAV should stay inside the PARAM1 radius before advancing, in milliseconds
+ * @param param3 PARAM3 / For LOITER command MISSIONs: Orbit to circle around the MISSION, in meters. If positive the orbit direction should be clockwise, if negative the orbit direction should be counter-clockwise.
+ * @param param4 PARAM4 / For NAV and LOITER command MISSIONs: Yaw orientation in degrees, [0..360] 0 = NORTH
+ * @param x PARAM5 / local: x position, global: latitude
+ * @param y PARAM6 / y position: global: longitude
+ * @param z PARAM7 / z position: global: altitude
+ mavlink_msg_mission_item_send(mavlink_channel_t chan, uint8_t target_system, uint8_t target_component, uint16_t seq, uint8_t frame, uint16_t command, uint8_t current, uint8_t autocontinue, float param1, float param2, float param3, float param4, float x, float y, float z)
+ */
+      mavlink_msg_mission_item_send(MAVLINK_COMM_0,
+      apm_mav_system,
+      apm_mav_component,
+      0, // sequence number of waypoint
+      MAV_FRAME_GLOBAL, // frame
+      MAV_CMD_NAV_WAYPOINT, // command
+      1, // current waypoint
+      0, // autocontinue
+      1, // param1
+      1000, // param2
+      0, // param3
+      0, // param4
+      lat,
+      lon,
+      z);
 }
 
 // Request data streams from the APM
@@ -112,6 +188,7 @@ void comm_receive() {
                                     Serial.print("\tHeading: ");
                                     Serial.print(mavlink_msg_vfr_hud_get_heading(&msg));
                                     Serial.print("\n");
+                                    yaw = mavlink_msg_vfr_hud_get_heading(&msg);
                                 }
                                 break;
 				case MAVLINK_MSG_ID_GPS_RAW_INT:
@@ -126,6 +203,9 @@ void comm_receive() {
                                         Serial.print("\tFix: ");
                                         Serial.print(mavlink_msg_gps_raw_int_get_fix_type(&msg));
                                         Serial.print("\n");
+                                        lat = mavlink_msg_gps_raw_int_get_lat(&msg);
+                                        lon = mavlink_msg_gps_raw_int_get_lon(&msg);
+                                        z = mavlink_msg_gps_raw_int_get_alt(&msg);
 				/*
 					osd_lat = mavlink_msg_gps_raw_get_lat(&msg);
 					osd_lon = mavlink_msg_gps_raw_get_lon(&msg);
@@ -203,5 +283,82 @@ void sendHeartbeat(){
 
 	// Send the message (.write sends as bytes)
 	Serial3.write(buf, len);
+}
+
+int findY(){
+  //read the pushbutton value into a variable
+  int A2 = digitalRead(22);
+  int A1 = digitalRead(24);
+  int A0 = digitalRead(26);
+  
+  //print out the value of the pushbutton
+  Serial.print(A2);
+  Serial.print(A1);
+  Serial.print(A0);
+  Serial.println();
+  Serial.print((A2 << 2) | (A1 << 1) | A0);
+  
+  return (A2 << 2) | (A1 << 1) | A0;
+}
+
+int findQ(){
+  int x = 0, q0 =0, q1 = 0, q2 = 0, q3 = 0;
+  q0 = digitalRead(28);
+  q1 = digitalRead(30);
+  q2 = digitalRead(32);
+  q3 = digitalRead(34);
+  
+  if(q0){
+    x = 0;
+  }
+  else if(q1){
+    x = 1;
+  }
+  else if(q2){
+    x = 2;
+  }
+  else if(q3){
+    x = 3;
+  }
+Serial.print(x);
+Serial.println();
+ return x; 
+}
+
+void BuildDegree(){
+ 
+ DegreeFinder[0][0] = 0;
+ DegreeFinder[0][1] = 90;
+ DegreeFinder[0][2] = 180;
+ DegreeFinder[0][3] = 270;
+ DegreeFinder[1][0] = 11;
+ DegreeFinder[1][1] = 101;
+ DegreeFinder[1][2] = 191;
+ DegreeFinder[1][3] = 281;
+ DegreeFinder[2][0] = 22;
+ DegreeFinder[2][1] = 112;
+ DegreeFinder[2][2] = 202;
+ DegreeFinder[2][3] = 292;
+ DegreeFinder[3][0] = 34;
+ DegreeFinder[3][1] = 124;
+ DegreeFinder[3][2] = 214;
+ DegreeFinder[3][3] = 304;
+ DegreeFinder[4][0] = 45;
+ DegreeFinder[4][1] = 135;
+ DegreeFinder[4][2] = 225;
+ DegreeFinder[4][3] = 315;
+ DegreeFinder[5][0] = 56;
+ DegreeFinder[5][1] = 146;
+ DegreeFinder[5][2] = 236;
+ DegreeFinder[5][3] = 326;
+ DegreeFinder[6][0] = 67;
+ DegreeFinder[6][1] = 157;
+ DegreeFinder[6][2] = 247;
+ DegreeFinder[6][3] = 337;
+ DegreeFinder[7][0] = 79;
+ DegreeFinder[7][1] = 169;
+ DegreeFinder[7][2] = 259;
+ DegreeFinder[7][3] = 349;
+
 }
 
