@@ -27,26 +27,32 @@ float lat = 0;
 float lon = 0;
 float z = 0;
 float yaw = 0;
-int degree = 0;
+int degree[4] = {0, 0, 0, 0};
 
 
 // Initializes the serial ports
 void setup() {
 	Serial.begin(115200);
 	Serial3.begin(57600);
-        pinMode(22, INPUT);
-        pinMode(24, INPUT);
-        pinMode(26, INPUT);
-        pinMode(28, INPUT);
-        pinMode(30, INPUT);
-        pinMode(32, INPUT); 
-        pinMode(34, INPUT);
+
+        pinMode(49, INPUT); //B4
+        pinMode(48, INPUT); //B3
+        pinMode(51, INPUT); //B2
+
+        pinMode(46, INPUT); //Q2
+        pinMode(47, INPUT); //Q3
+        pinMode(44, INPUT); //Q4
+        pinMode(45, INPUT); //Q5
+  
+        //RSSI
+        pinMode(53 , INPUT); //Digital Output; Not Used
         BuildDegree();
 }
 
 void loop() {
         requestData();
 	comm_receive();
+        getDegree();
         doMath();
         checkCollision();
         setWaypoint();
@@ -54,23 +60,31 @@ void loop() {
 }
 
 void checkCollision(){
-      if(degree > 315 && degree < 45){
+      if(degree[0] > 315 && degree[0] < 45){
         // check sensors on front arm
-      } else if(degree > 45 && degree < 135){
+      } else if(degree[0] > 45 && degree[0] < 135){
         // check sensors on right arm
-      } else if(degree > 135 && degree < 225){
+      } else if(degree[0] > 135 && degree[0] < 225){
         // check sensors on back arm
       } else {
         //check sensor on left arm
       }
 }
 
+void getDegree(){ 
+    int Y = 0;
+    int Q = 0;
+    for(int i =0; i<4; i++){
+       Y = findY();
+       Q = findQ();
+       degree[i] = DegreeFinder[Y][Q];
+    }
+     
+}
+
 void doMath(){
-     int Y = findY();
-     int Q = findQ();
-     degree = DegreeFinder[Y][Q];
-     int dir = yaw + degree;
-     lat = lat + 1*cos(dir);
+     int dir = yaw + degree[0];
+     lat = lat + 1*cos(dir); // needs to be changed from a 1 becuase 1 in lat/lon is a very large distance
      lon = lon + 1*sin(dir);
 }
 
@@ -285,28 +299,31 @@ void sendHeartbeat(){
 	Serial3.write(buf, len);
 }
 
+//Finds the Y part to find degree
+
 int findY(){
-  //read the pushbutton value into a variable
-  int A2 = digitalRead(22);
-  int A1 = digitalRead(24);
-  int A0 = digitalRead(26);
+
+  int A2 = digitalRead(49); //B4
+  int A1 = digitalRead(48); //B3
+  int A0 = digitalRead(51); //B2
   
-  //print out the value of the pushbutton
-  Serial.print(A2);
-  Serial.print(A1);
-  Serial.print(A0);
+  Serial.print(A2); //B4
+  Serial.print(A1); //B3
+  Serial.print(A0); //B2
   Serial.println();
-  Serial.print((A2 << 2) | (A1 << 1) | A0);
+  //Serial.print((A2 << 2) | (A1 << 1) | A0);
   
   return (A2 << 2) | (A1 << 1) | A0;
 }
 
+//Finds the Q for finding degree
+
 int findQ(){
   int x = 0, q0 =0, q1 = 0, q2 = 0, q3 = 0;
-  q0 = digitalRead(28);
-  q1 = digitalRead(30);
-  q2 = digitalRead(32);
-  q3 = digitalRead(34);
+  q0 = digitalRead(46); //Q2
+  q1 = digitalRead(47); //Q3
+  q2 = digitalRead(44); //Q4
+  q3 = digitalRead(45); //Q5
   
   if(q0){
     x = 0;
@@ -320,10 +337,12 @@ int findQ(){
   else if(q3){
     x = 3;
   }
-Serial.print(x);
-Serial.println();
- return x; 
+  Serial.print(x);
+  Serial.println();
+   return x;
 }
+
+//Builds 2 dimensional array holding degree values
 
 void BuildDegree(){
  
@@ -361,4 +380,3 @@ void BuildDegree(){
  DegreeFinder[7][3] = 349;
 
 }
-
