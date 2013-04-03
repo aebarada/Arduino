@@ -27,7 +27,8 @@ float lat = 0;
 float lon = 0;
 float z = 0;
 float yaw = 0;
-int degree[4] = {0, 0, 0, 0};
+int degree = 0;
+int check[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 
 // Initializes the serial ports
@@ -60,11 +61,11 @@ void loop() {
 }
 
 void checkCollision(){
-      if(degree[0] > 315 && degree[0] < 45){
+      if(degree > 315 && degree < 45){
         // check sensors on front arm
-      } else if(degree[0] > 45 && degree[0] < 135){
+      } else if(degree > 45 && degree < 135){
         // check sensors on right arm
-      } else if(degree[0] > 135 && degree[0] < 225){
+      } else if(degree > 135 && degree < 225){
         // check sensors on back arm
       } else {
         //check sensor on left arm
@@ -74,16 +75,23 @@ void checkCollision(){
 void getDegree(){ 
     int Y = 0;
     int Q = 0;
-    for(int i =0; i<4; i++){
+    int greatest = 0;
+    memset(check, 0, sizeof(check)/sizeof(check[0]));
+    for(int i =0; i<=5; i++){
        Y = findY();
        Q = findQ();
-       degree[i] = DegreeFinder[Y][Q];
+       check[DegreeFinder[Y][Q]]++;
     }
-     
+    for(int i = 0; i <=32; i++){
+        if(check[i] > greatest){
+           greatest = check[i]; 
+        }
+    }
+    degree = greatest;
 }
 
 void doMath(){
-     int dir = yaw + degree[0];
+     int dir = yaw + degree;
      lat = lat + 1*cos(dir); // needs to be changed from a 1 becuase 1 in lat/lon is a very large distance
      lon = lon + 1*sin(dir);
 }
@@ -138,7 +146,6 @@ void requestData(){
         }
         enable_mav_request = false;
         delay(2000);
-        //lastMAVBeat = millis();//Preventing error from delay sensing
     }
 }
 
