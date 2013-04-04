@@ -92,8 +92,12 @@ void getDegree(){
 
 void doMath(){
      int dir = yaw + degree;
-     lat = lat + 1*cos(dir); // needs to be changed from a 1 becuase 1 in lat/lon is a very large distance
-     lon = lon + 1*sin(dir);
+     float dx = 1*cos(dir); // needs to be changed from a 1 becuase 1 in lat/lon is a very large distance
+     float dy = 1*sin(dir);
+	 float delta_lon = dx/(111320*cos(lat))
+	 float delta_lat = dy/110540
+	 lat = lat + delta_lat;
+	 lon = lon + delta_lon;
 }
 
 void setWaypoint(){
